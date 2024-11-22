@@ -1,11 +1,8 @@
 [package]
-name = "screen"
+name = "cell-explorer"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-flo_canvas = "0.3.1"
-flo_draw = "0.3.1"
 minifb = "0.27.0"
-nannou = "0.19.0"
 rand = "0.8.5"
