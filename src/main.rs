@@ -2,6 +2,8 @@ use minifb::{Key, Scale, Window, WindowOptions};
 use rand::Rng;
 
 struct Automaton {
+    width: usize,
+    height: usize,
     rule: u8,
     states: Vec<Vec<bool>>,
     age: usize,
@@ -10,11 +12,13 @@ struct Automaton {
 impl Automaton {
     fn new(rule: u8, width: usize, height: usize) -> Self {
         let mut rng = rand::thread_rng();
-        let mut states = vec![vec![false; width]; height];
+        let mut states = vec![vec![false; width]];
 
-        states[height - 1].fill_with(|| rng.gen());
+        states[0].fill_with(|| rng.gen());
 
         Self {
+            width,
+            height,
             rule,
             states,
             age: 0,
@@ -40,8 +44,13 @@ impl Automaton {
         next[0] = self.eval(false, last[0], last[1]);
         next[n - 1] = self.eval(last[n - 2], last[n - 1], false);
 
+        // Append the state to the history, keeping history depth bounded
+        if self.states.len() >= self.height {
+            self.states.remove(0);
+        }
+
         self.states.push(next);
-        self.states.remove(0);
+
         self.age += 1;
     }
 
@@ -56,7 +65,10 @@ impl Automaton {
         const MAX_PERIOD: usize = 10;
 
         let n = self.states.len() - 1;
-        (1..MAX_PERIOD).any(|p| (0..p).all(|i| self.states[n - i] == self.states[n - i - p]))
+        (1..MAX_PERIOD).any(|p| {
+            self.states.len() > 2 * p
+                && (0..p).all(|i| self.states[n - i] == self.states[n - i - p])
+        })
     }
 
     // How many generations has this population been alive?
@@ -70,7 +82,13 @@ impl Automaton {
 
         self.states
             .iter()
-            .map(|r| r.iter().map(|&b| if b { WHITE } else { BLACK }))
+            .map(|r| {
+                r.iter()
+                    .map(|&b| if b { WHITE } else { BLACK })
+                    .collect::<Vec<_>>()
+            })
+            .chain(std::iter::repeat(vec![BLACK; self.width]))
+            .take(self.height)
             .flatten()
             .collect()
     }
