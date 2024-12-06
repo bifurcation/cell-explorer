@@ -1,14 +1,10 @@
 use minifb::{Key, Scale, Window, WindowOptions};
 use rand::Rng;
 
-const WIDTH: usize = 240;
-const HEIGHT: usize = 320;
-const BLACK: u32 = 0x00000000;
-const WHITE: u32 = 0x00FFFFFF;
-
 struct Automaton {
     rule: u8,
     states: Vec<Vec<bool>>,
+    age: usize,
 }
 
 impl Automaton {
@@ -18,7 +14,11 @@ impl Automaton {
 
         states[height - 1].fill_with(|| rng.gen());
 
-        Self { rule, states }
+        Self {
+            rule,
+            states,
+            age: 0,
+        }
     }
 
     fn eval(&self, left: bool, center: bool, right: bool) -> bool {
@@ -42,6 +42,7 @@ impl Automaton {
 
         self.states.push(next);
         self.states.remove(0);
+        self.age += 1;
     }
 
     // Check to see if the most recent state is uniform
@@ -58,7 +59,15 @@ impl Automaton {
         (1..MAX_PERIOD).any(|p| (0..p).all(|i| self.states[n - i] == self.states[n - i - p]))
     }
 
+    // How many generations has this population been alive?
+    fn age(&self) -> usize {
+        self.age
+    }
+
     fn render(&self) -> Vec<u32> {
+        const BLACK: u32 = 0x00000000;
+        const WHITE: u32 = 0x00FFFFFF;
+
         self.states
             .iter()
             .map(|r| r.iter().map(|&b| if b { WHITE } else { BLACK }))
@@ -67,7 +76,20 @@ impl Automaton {
     }
 }
 
+fn rand_automaton(reason: &str, width: usize, height: usize) -> Automaton {
+    println!("{}", reason);
+
+    let rule: u8 = rand::thread_rng().gen();
+    println!("rule: {}", rule);
+
+    Automaton::new(rule, width, height)
+}
+
 fn main() {
+    const WIDTH: usize = 240;
+    const HEIGHT: usize = 320;
+    const MAX_AGE: usize = 5 * HEIGHT;
+
     let mut window = Window::new(
         "Press ESC to exit",
         WIDTH,
@@ -84,26 +106,17 @@ fn main() {
     window.set_target_fps(60);
     window.set_background_color(0, 0, 0);
 
-    let rule: u8 = rand::thread_rng().gen();
-    println!("rule: {}", rule);
-
-    let mut buffer = Automaton::new(rule, WIDTH, HEIGHT);
+    let mut buffer = rand_automaton("initial", WIDTH, HEIGHT);
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
         buffer.step();
 
         if buffer.uniform() {
-            println!("reached uniform state");
-
-            let rule: u8 = rand::thread_rng().gen();
-            println!("rule: {}", rule);
-            buffer = Automaton::new(rule, WIDTH, HEIGHT);
+            buffer = rand_automaton("reached uniform state", WIDTH, HEIGHT)
         } else if buffer.periodic() {
-            println!("reached periodic state");
-
-            let rule: u8 = rand::thread_rng().gen();
-            println!("rule: {}", rule);
-            buffer = Automaton::new(rule, WIDTH, HEIGHT);
+            buffer = rand_automaton("reached periodic state", WIDTH, HEIGHT)
+        } else if buffer.age() > MAX_AGE {
+            buffer = rand_automaton("reached max age", WIDTH, HEIGHT)
         }
 
         window
